@@ -1,32 +1,6 @@
-Installing Kubernetes with kubeadm on Ubuntu 20.04 LTS
-
-As Per Kubernetes Official Guideline You Must Need Following: 
-A compatible Linux host. The Kubernetes project provides generic instructions for Linux distributions based on Debian and Red Hat, and those distributions without a package manager.
-2 GB or more of RAM per machine (any less will leave little room for your apps).
-2 CPUs or more.
-Full network connectivity between all machines in the cluster (public or private network is fine).
-Unique hostname, MAC address, and product_uuid for every node. 
-Certain ports are open on your machines. 
-Swap disabled. You MUST disable swap in order for the kubelet to work properly.
-For example, sudo swapoff -a will disable swapping temporarily. To make this change persistent across reboots, make sure swap is disabled in config files like /etc/fstab, systemd.swap, depending how it was configured on your system.
-Verify hostname, MAC address and product_uuid:
-
-Hostname: hostnamectl
-MAC Address: ip add or ip link
-Product_uuid: sudo cat /sys/class/dmi/id/product_uuid
-
-Container runtime:
-To run containers in Pods, Kubernetes uses a container runtime. By default, Kubernetes uses the Container Runtime Interface (CRI) to interface with your chosen container runtime.
-If you don't specify a runtime, kubeadm automatically tries to detect an installed container runtime by scanning through a list of known endpoints.
-
-Installation Note: 
-Docker and containerd.io both are required on master 
-
-
-
 Installing Steps : 
 
-Configure Hostname:
+## Configure Hostname:
 Edit the hosts file as per following example
 10.200.205.186  master
 10.200.201.75 node-1 worker-node-1
@@ -43,7 +17,7 @@ cat <<EOF> /etc/hosts
 EOF
 
 
-Load Kernel modules & settings
+## Load Kernel modules & settings
 sudo modprobe overlay
 sudo modprobe br_netfilter
 
