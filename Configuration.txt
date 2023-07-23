@@ -1,0 +1,180 @@
+Installing Kubernetes with kubeadm on Ubuntu 20.04 LTS
+
+As Per Kubernetes Official Guideline You Must Need Following: 
+A compatible Linux host. The Kubernetes project provides generic instructions for Linux distributions based on Debian and Red Hat, and those distributions without a package manager.
+2 GB or more of RAM per machine (any less will leave little room for your apps).
+2 CPUs or more.
+Full network connectivity between all machines in the cluster (public or private network is fine).
+Unique hostname, MAC address, and product_uuid for every node. 
+Certain ports are open on your machines. 
+Swap disabled. You MUST disable swap in order for the kubelet to work properly.
+For example, sudo swapoff -a will disable swapping temporarily. To make this change persistent across reboots, make sure swap is disabled in config files like /etc/fstab, systemd.swap, depending how it was configured on your system.
+Verify hostname, MAC address and product_uuid:
+
+Hostname: hostnamectl
+MAC Address: ip add or ip link
+Product_uuid: sudo cat /sys/class/dmi/id/product_uuid
+
+Container runtime:
+To run containers in Pods, Kubernetes uses a container runtime. By default, Kubernetes uses the Container Runtime Interface (CRI) to interface with your chosen container runtime.
+If you don't specify a runtime, kubeadm automatically tries to detect an installed container runtime by scanning through a list of known endpoints.
+
+Installation Note: 
+Docker and containerd.io both are required on master 
+
+
+
+Installing Steps : 
+
+Configure Hostname:
+Edit the hosts file as per following example
+10.200.205.186  master
+10.200.201.75 node-1 worker-node-1
+10.200.205.76 node-2 worker-node-2
+ 
+OR copy and paste  to your terminal changing your ip address
+
+cat <<EOF> /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+10.200.205.186  master
+10.200.201.75 node-1 worker-node-1
+10.200.205.76 node-2 worker-node-2
+EOF
+
+
+Load Kernel modules & settings
+sudo modprobe overlay
+sudo modprobe br_netfilter
+
+To write it permanently do the following things
+
+echo "br_netfilter" | sudo tee -a /etc/modules
+
+Set the following Kernel parameters:
+vi /etc/sysctl.conf
+# Add the following line at the end of the file
+
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+
+Reload the changes :
+
+sudo sysctl -p
+
+
+Update Ubuntu:
+sudo apt update
+sudo apt -y upgrade
+
+Disable swap
+
+sudo swapoff -a
+
+You Must permanently disable swap from fstab entry otherwise you will face a problem when you reboot your nodes.
+
+
+Disable your firewall or you must all the following port to all your nodes:
+6443/tcp, 2379-2380/tcp, 10250/tcp, 10251/tcp, 10252/tcp 10255/tcp
+
+
+
+Add Kubernetes repositories
+
+sudo apt install -y apt-transport-https ca-certificates
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
+echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" >> ~/kubernetes.list
+sudo mv ~/kubernetes.list /etc/apt/sources.list.d
+sudo apt update
+
+Install Docker and Containerd.io
+
+sudo apt-get install -y wget gnupg-agent software-properties-common
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+sudo apt-get update -y
+sudo apt remove containerd
+sudo apt install -y docker-ce docker-ce-cli containerd.io
+sudo rm /etc/containerd/config.toml
+
+Start and Enable Docker
+sudo mkdir /etc/docker
+cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+"exec-opts": ["native.cgroupdriver=systemd"],
+"log-driver": "json-file",
+"log-opts": {
+"max-size": "100m"
+},
+"storage-driver": "overlay2"
+}
+EOF
+
+Restart all docker and containerd service
+
+sudo systemctl enable --now docker
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+sudo systemctl status docker
+sudo systemctl restart containerd
+
+Install Kubernetes tools
+sudo apt install -y kubelet kubeadm kubectl kubernetes-cni
+
+
+If you want to prevent your package to automatically upgraded or remove runt the following command.
+
+sudo apt-mark hold kubelet kubeadm kubectl
+
+Initialize the cluster with kubeadm
+
+kubeadm init
+
+
+After successfully execute kubeadm init you will get the following output:
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 10.200.205.186:6443 --token 3ig80y.m06brapbh2xm590v \
+        --discovery-token-ca-cert-hash sha256:b7575ded3e4c84bcd34bed3bd6a2c5bb8e972915175b805cc79cc74735f35600
+
+
+Configure kubectl
+
+sudo mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+Deploy POD Network
+We will use Weavenet plugin
+kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
+
+Lets checks your Cluster now:
+
+kubectl get nodes -o wide
+Kubectl get pod -n kube-system
+
+If you find your control-panel is ready status you have successfully done your cluster. Now join your worker to your cluster with the provided command during kubeadm init. 
+
+
